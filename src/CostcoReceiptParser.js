@@ -16,9 +16,12 @@ class CostcoReceiptParser {
     this.hasRemainingTransactions = true;
     this.date = undefined;
     this.cardLastFour = undefined;
+    this.pendingQuantity = undefined;
+    this.pendingUnitAmount = undefined;
 
     this.totalCalculated = 0;
     this.total = 0;
+    this.subtotal = 0;
     this.tax = 0;
 
     this.numItemsSoldReceipt = 0;
@@ -54,6 +57,8 @@ class CostcoReceiptParser {
     }
 
     if (this.#find(line, "SUBTOTAL")) {
+      const subtotal = this.#find(line, "SUBTOTAL");
+      this.subtotal = this.#formatAmount(subtotal);
       return;
     }
 
@@ -75,6 +80,13 @@ class CostcoReceiptParser {
       return;
     }
 
+    const quantityLine = this.#parseQuantityLine(line);
+    if (quantityLine) {
+      this.pendingQuantity = quantityLine.quantity;
+      this.pendingUnitAmount = quantityLine.unitAmount;
+      return;
+    }
+
     // A transaction might span multiple lines.
     //
     // Example:
@@ -82,15 +94,13 @@ class CostcoReceiptParser {
     //   CABERNET
     //   7.99- A
     const multilineTransaction = this.#parseMultilineTransaction(line);
-    if (multilineTransaction) {
-      return multilineTransaction;
-    }
+    if (multilineTransaction) return this.#attachPendingQuantity(multilineTransaction);
   
     // A typical transaction spans only one line.
     //
     // Example:
     //   1204135 ORG FIRM TO 6.49
-    return this.#parseTransaction(line);
+    return this.#attachPendingQuantity(this.#parseTransaction(line));
   }
 
   getNumItemsSoldCalculated() {
@@ -109,6 +119,18 @@ class CostcoReceiptParser {
     return this.total;
   }
 
+  getSubtotal() {
+    return this.subtotal || (this.total - this.tax);
+  }
+
+  getTax() {
+    return this.tax;
+  }
+
+  getReceiptIdentifier() {
+    return this.receiptIdentifier;
+  }
+
   getDate() {
     return this.date;
   }
@@ -121,13 +143,19 @@ class CostcoReceiptParser {
     // this.storeLines might look like:
     //   ['AUSTIN #681', '10401 RESEARCH BLVD', 'AUSTIN,TX78759']
     const splitCityStateZipOnComma = this.storeLines[2].split(",");
+    const location = String(splitCityStateZipOnComma[1] || "").trim();
+    const region = location.slice(0, 2).toUpperCase();
+    const canadianProvinces = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+    const canadianPostalCode = location.match(/[A-Z]\d[A-Z]\s?\d[A-Z]\d/i)?.[0];
+    const usZipCode = location.match(/\d{5}(?:-\d{4})?/)?.[0];
 
     return {
       store: this.storeLines[0],
       street: this.storeLines[1],
-      city: splitCityStateZipOnComma[0],
-      zipCode: splitCityStateZipOnComma[1].slice(-5),
-      state: splitCityStateZipOnComma[1].slice(0, 2),
+      city: String(splitCityStateZipOnComma[0] || "").trim(),
+      zipCode: canadianPostalCode || usZipCode || "",
+      state: region,
+      country: canadianProvinces.has(region) || canadianPostalCode ? "CA" : "US",
     };
   }
 
@@ -135,9 +163,9 @@ class CostcoReceiptParser {
   // of the receipt starts with the member number.
   //
   // Example:
-  //   Member 121549142109
+  //   Member 123456789012
   //   Member
-  //   121549142109
+  //   123456789012
   #parseMemberIdentifier(line) {
     if (line.includes("Member")) {
       this.memberIdentifier.push(line);
@@ -189,8 +217,9 @@ class CostcoReceiptParser {
     const hasDollarAmount = /\.[0-9]{2}/.test(line);
     if (!this.multilineMode && !hasDollarAmount) {
       this.multilineMode = true;
-      this.multilineModeCurrentItemIdentifier = line;
-      this.multilineModeCurrentItemName = "";
+      const inlineItem = line.trim().match(/^([A-Z]?[0-9]+)\s+(.+)$/);
+      this.multilineModeCurrentItemIdentifier = inlineItem ? inlineItem[1] : line;
+      this.multilineModeCurrentItemName = inlineItem ? inlineItem[2] : "";
 
       console.debug(` parseMultilineTransaction; not multiline mode, no dollar amount, so first line of a multiline entry. [${line}, Item ID: ${this.multilineModeCurrentItemIdentifier}, ItemName: ${this.multilineModeCurrentItemName}]`);
 
@@ -236,11 +265,20 @@ class CostcoReceiptParser {
       for (const itemIdentifier of Object.keys(this.itemNameByItemIdentifier)) {
         // "329256/77713142.00".split("/") => [329256, 77713142.00]
         // 77713142.00, split on 7771314 => ["", 2.00]
-        const splitOnItemIdentifier = line.split("/")[1].split(itemIdentifier);
+        const slashParts = line.split("/");
+        if (slashParts.length < 2) {
+          continue;
+        }
+
+        const splitOnItemIdentifier = slashParts[1].split(itemIdentifier);
         if (splitOnItemIdentifier[0] === "") {
           console.debug(` parseTransaction; includes slash, match found. [${itemIdentifier}, ${this.itemNameByItemIdentifier[itemIdentifier]}, ${splitOnItemIdentifier[1]}]`);
 
           const amount = this.#formatAmount(splitOnItemIdentifier[1]);
+          if (amount === undefined) {
+            return;
+          }
+
           this.totalCalculated += amount;
 
           return {
@@ -375,12 +413,40 @@ class CostcoReceiptParser {
   }
   
   #formatAmount(amount) {
+    if (typeof amount !== "string") {
+      return;
+    }
+
+    amount = amount.trim();
+    if (!amount) {
+      return;
+    }
+
     // check if last char is a `-`, this means it's negative (refund)
     if (amount.slice(-1) === "-") {
       return this.numberUtils.dollarToNumber(amount.slice(0, -1), true);
     }
 
     return this.numberUtils.dollarToNumber(amount);
+  }
+
+  #parseQuantityLine(line) {
+    const match = String(line || "").trim().match(/^(\d+)\s*@\s*(\$?\s*[0-9,]+\.[0-9]{2})$/);
+    if (!match) return;
+    return {
+      quantity: Number(match[1]),
+      unitAmount: this.#formatAmount(match[2])
+    };
+  }
+
+  #attachPendingQuantity(transaction) {
+    if (!transaction || !this.pendingQuantity || transaction.amount <= 0) return transaction;
+    transaction.quantity = this.pendingQuantity;
+    transaction.unitAmount = this.pendingUnitAmount;
+    this.numItemsSoldCalculated += this.pendingQuantity - 1;
+    this.pendingQuantity = undefined;
+    this.pendingUnitAmount = undefined;
+    return transaction;
   }
   
   #find(line, str) {

@@ -1,15 +1,67 @@
 {
-  "name": "costco-wrapped",
-  "author": "https://www.pathtosimple.com/",
-  "version": "1.0.0",
-  "description": "Parse Costco receipts to get fun stats, a la Spotify Wrapped.",
-  "main": "index.js",
+  "name": "costco-receipt-organizer",
+  "author": "shubhamg0406",
+  "version": "1.3.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "A private, local-first Costco receipt organizer for macOS.",
+  "homepage": "https://github.com/shubhamg0406/Costco-Receipt-Organizer#readme",
+  "bugs": {
+    "url": "https://github.com/shubhamg0406/Costco-Receipt-Organizer/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shubhamg0406/Costco-Receipt-Organizer.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "electron/main.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js",
+    "parse": "node index.js",
+    "electron": "electron .",
+    "test": "node test/digital-receipt-importer.test.js && node test/receipt-history.test.js && node test/deal-scanner.test.js && node test/costco-sync.test.js && node test/user-data.test.js",
+    "test:ui": "electron test/ui-smoke.js",
+    "test:native": "electron test/native-smoke.js",
+    "dist": "electron-builder --mac dmg"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "csv-writer": "^1.6.0",
-    "pdfdataextract": "^3.2.0"
+    "pdfdataextract": "^4.0.0"
+  },
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.shubhamg0406.costcoreceiptorganizer",
+    "productName": "Costco Receipt Organizer",
+    "artifactName": "Costco-Receipt-Organizer-${version}-${arch}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "ocr.swift"
+    ],
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "src/**/*",
+      "server.js",
+      "ocr.swift",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "identity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "category": "public.app-category.utilities"
+    }
   }
 }

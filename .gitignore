@@ -1,4 +1,35 @@
+# Dependencies and generated builds
 node_modules/
-costco-receipt-pdfs/
+dist/
+release/
+*.app/
+*.dmg
 out/
+coverage/
+test-results/
+playwright-report/
+
+# Private receipt libraries and exports
+.costco-data/
+costco-receipt-pdfs/
+receipts/
+raw-receipts/
+*.pdf
+*.csv
+*.sqlite
+*.sqlite-*
+*.zip
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
+.secrets*
+
+# macOS and local process files
 .DS_Store
+*.log
+*.pid

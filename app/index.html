@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Costco Receipt Organizer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-lockup">
+          <div class="brand-mark">C</div>
+          <div><div class="brand-name">Costco Receipt Organizer</div><div class="brand-subtitle">Private local archive</div></div>
+        </div>
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <button class="nav-item active" data-view="items"><span class="nav-icon">⌕</span>Items</button>
+          <button class="nav-item" data-view="receipts"><span class="nav-icon">▤</span>Receipts</button>
+          <button class="nav-item" data-view="price-match"><span class="nav-icon">↘</span>Price Match</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="local-status"><span class="status-dot"></span><div><strong>Stored locally</strong><small>Your PDFs never leave this Mac.</small></div></div>
+          <div class="storage-label"><span>Receipt library</span><span id="receipt-count-side">0</span></div>
+        </div>
+      </aside>
+
+      <main class="main-shell">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Costco Receipt Organizer</span><span class="slash">/</span><span id="view-label">Items</span></div>
+          <div class="topbar-actions">
+            <label class="market-control"><span>Market</span><select id="market-select" aria-label="Costco market"><option value="CA">Canada</option><option value="US">United States</option></select></label>
+            <button class="top-cart-button" id="top-cart-button" aria-label="Open receipt cart">Receipt cart <span id="top-cart-count">0</span></button>
+            <button class="icon-button" id="refresh-button" title="Refresh library">↻</button>
+          </div>
+        </header>
+
+        <div class="page-wrap">
+          <section class="workspace-head">
+            <div>
+              <h1 id="page-title">Find any purchase.</h1>
+              <p class="page-intro">Search your Costco history by item number, name, or receipt detail.</p>
+            </div>
+            <button class="primary-button" id="import-button" hidden><span>＋</span> Import PDF</button>
+            <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden />
+          </section>
+
+          <section class="search-bar-shell">
+            <span class="search-symbol">⌕</span>
+            <input id="search-input" autocomplete="off" placeholder="Search item number, name, warehouse, receipt…" />
+            <kbd>⌘ K</kbd>
+          </section>
+
+          <div class="view-content" id="view-content"></div>
+        </div>
+      </main>
+    </div>
+
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <aside class="detail-drawer" id="detail-drawer" aria-hidden="true"></aside>
+    <div class="toast" id="toast"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
